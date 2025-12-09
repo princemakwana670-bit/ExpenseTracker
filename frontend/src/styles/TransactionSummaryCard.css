@@ -1,0 +1,29 @@
+.ts-card {
+  width: 220px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.ts-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.ts-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+}
+
+.label {
+  color: #555;
+  font-size: 14px;
+}
+
+.value {
+  font-weight: 600;
+  font-size: 14px;
+}
