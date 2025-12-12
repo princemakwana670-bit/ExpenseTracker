@@ -1,17 +1,16 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
-import { ExpenseProvider } from "./context/ExpenseContext";
+import App from "./App.jsx";
 
-// Bootstrap CSS (utilities) - optional but convenient
+// Bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
-// Custom globals
+import "bootstrap/dist/js/bootstrap.bundle.min.js";
+
+// custom styles
 import "./styles/globals.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ExpenseProvider>
-      <App />
-    </ExpenseProvider>
+    <App />
   </React.StrictMode>
 );

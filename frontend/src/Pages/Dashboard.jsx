@@ -1,83 +1,248 @@
-import { useEffect, useState } from "react";
-import { useExpenses } from "../context/ExpenseContext";
-import SummaryCard from "../components/SummaryCard/SummaryCard";
-import ExpenseList from "../components/ExpenseList/ExpenseList";
-import AddExpenseModal from "../components/AddExpenseModal/AddExpenseModal";
-import ExpenseChart from "../components/Charts/ExpenseChart";
+import { useMemo, useState } from "react";
+import NavbarHeader from "../components/NavbarHeader";
+import SummaryCard from "../components/SummaryCard";
+import ExpenseList from "../components/ExpenseList";
+import CategoryChart from "../components/CategoryChart";
 
-const Dashboard = () => {
-  const { expenses, addExpense, deleteExpense, totals } = useExpenses();
-  const [showModal, setShowModal] = useState(false);
+/* sample/dummy data matching screenshot style */
+const seedExpenses = [
+  {
+    id: 1,
+    title: "Shoes",
+    category: "Food & Dining",
+    amount: 800,
+    date: "2025-12-11",
+  },
+  {
+    id: 2,
+    title: "Vadapav",
+    category: "Food & Dining",
+    amount: 30,
+    date: "2025-12-11",
+  },
+  {
+    id: 3,
+    title: "Samosa",
+    category: "Food & Dining",
+    amount: 50,
+    date: "2025-12-11",
+  },
+  {
+    id: 4,
+    title: "Vacation",
+    category: "Food & Dining",
+    amount: 550,
+    date: "2025-12-11",
+  },
+  {
+    id: 5,
+    title: "Dubai",
+    category: "Transport",
+    amount: 1000,
+    date: "2025-12-01",
+  },
+  {
+    id: 6,
+    title: "Burger and Pizza",
+    category: "Food & Dining",
+    amount: 50,
+    date: "2025-12-01",
+  },
+];
 
-  // open modal when navbar fires event
-  useEffect(() => {
-    const handler = () => setShowModal(true);
-    window.addEventListener("open-add-modal", handler);
-    return () => window.removeEventListener("open-add-modal", handler);
-  }, []);
+export default function Dashboard() {
+  const [expenses, setExpenses] = useState(seedExpenses);
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All Categories");
 
-  // Produce chart data aggregated by category for last 30 days, simple example
-  const chartData = (() => {
+  const filtered = useMemo(() => {
+    return expenses.filter((e) => {
+      const matchesQuery = e.title.toLowerCase().includes(query.toLowerCase());
+      const matchesCat =
+        categoryFilter === "All Categories" || e.category === categoryFilter;
+      return matchesQuery && matchesCat;
+    });
+  }, [expenses, query, categoryFilter]);
+
+  const totals = useMemo(() => {
+    const monthTotal = expenses.reduce((s, e) => s + e.amount, 0);
+    const weekTotal = 1430; // just placeholder like screenshot (or calculate by date)
+    return {
+      month: monthTotal,
+      week: weekTotal,
+      topCategory: "Food & Dining",
+      topAmount: 1480,
+    };
+  }, [expenses]);
+
+  // group by date (descending)
+  const grouped = useMemo(() => {
     const map = new Map();
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
+    filtered.forEach((e) => {
+      if (!map.has(e.date)) map.set(e.date, []);
+      map.get(e.date).push(e);
+    });
+    // convert to array and sort by date desc
+    return Array.from(map.entries()).sort(
+      (a, b) => new Date(b[0]) - new Date(a[0])
+    );
+  }, [filtered]);
 
-    for (const e of expenses) {
-      const d = new Date(e.date);
-      if (d >= cutoff) {
-        map.set(e.category, (map.get(e.category) || 0) + Number(e.amount || 0));
-      }
-    }
-
-    if (map.size === 0) {
-      // filler data
-      return [
-        { label: "Food", amount: 700 },
-        { label: "Transport", amount: 200 },
-        { label: "Bills", amount: 980 },
-        { label: "Shopping", amount: 400 }
-      ];
-    }
-
-    return Array.from(map.entries()).map(([label, amount]) => ({ label, amount }));
-  })();
+  const deleteExpense = (id) => {
+    setExpenses((prev) => prev.filter((p) => p.id !== id));
+  };
 
   return (
-    <div className="container">
-      {/* Summary */}
-      <div className="summary-grid">
-        <SummaryCard title="Today" amount={totals.today.amount} transactions={totals.today.count} />
-        <SummaryCard title="This Week" amount={totals.week.amount} transactions={totals.week.count} />
-        <SummaryCard title="This Month" amount={totals.month.amount} transactions={totals.month.count} />
-      </div>
+    <div className="app-container">
+      <NavbarHeader />
 
-      {/* Main area */}
-      <div className="expenses-area">
-        <div>
-          <h4 className="section-title">Recent Expenses</h4>
-          <ExpenseList expenses={expenses} onDelete={deleteExpense} />
+      <div className="summary-row">
+        <div className="summary-card">
+          <small className="text-muted">This Month</small>
+          <div className="stat-amount">
+            $
+            {totals.month.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
+          <div className="stat-sub">6 transactions</div>
         </div>
 
+        <div className="summary-card">
+          <small className="text-muted">This Week</small>
+          <div className="stat-amount">
+            $
+            {totals.week.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
+          <div className="stat-sub">Daily avg: $204.29</div>
+        </div>
+
+        <div className="summary-card">
+          <small className="text-muted">Top Category</small>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700 }}>Food & Dining</div>
+              <div className="stat-sub">
+                ${totals.topAmount.toFixed(2)} spent
+              </div>
+            </div>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                background: "#fff7e6",
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🍕</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="main-grid">
         <div>
-          <div style={{ marginBottom: 14 }}>
-            <h4 className="section-title">Add Quick Expense</h4>
-            <button className="btn-modern" onClick={() => setShowModal(true)}>+ Add New</button>
+          <div className="recent-header">
+            <h5>Recent Expenses</h5> <br />
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div className="search-row">
+                <input
+                  className="form-control form-control-sm"
+                  style={{ width: 320 }}
+                  placeholder="Search expenses..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 160 }}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option>All Categories</option>
+                <option>Food & Dining</option>
+                <option>Transport</option>
+                <option>Bills</option>
+                <option>Shopping</option>
+              </select>
+            </div>
           </div>
 
-          <h5 className="h5 muted">Spending Overview</h5>
-          <ExpenseChart data={chartData} />
+          {/* groups */}
+          {grouped.map(([date, items]) => (
+            <div key={date}>
+              <div className="group-date">
+                <div>
+                  {new Date(date).toLocaleDateString(undefined, {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+                <div className="muted">
+                  ${items.reduce((s, i) => s + i.amount, 0).toLocaleString()}
+                </div>
+              </div>
+
+              {items.map((it) => (
+                <div key={it.id} className="expense-item">
+                  <div className="expense-left">
+                    <div className="expense-icon">
+                      {it.category.includes("Food") ? "🍕" : "🚗"}
+                    </div>
+                    <div className="expense-meta">
+                      <div className="expense-title">{it.title}</div>
+                      <div className="expense-cat">{it.category}</div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
+                  >
+                    <div className="expense-amount">
+                      -${it.amount.toFixed(2)}
+                    </div>
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => deleteExpense(it.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <div className="right-card">
+            <h6 className="section-title">Spending by Category</h6>
+            <CategoryChart expenses={expenses} />
+          </div>
         </div>
       </div>
 
-      <AddExpenseModal
-        show={showModal}
-        onClose={() => setShowModal(false)}
-        onAdd={(payload) => {
-          addExpense(payload);
-        }}
-      />
+      <div className="footer">
+        Built with care. Track wisely, spend smarter.
+      </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
