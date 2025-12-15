@@ -3,73 +3,77 @@ const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
 const PORT = 3000;
-const url = "mongodb://localhost:27017/ExpenseTracker";
+const url = "mongodb://localhost:27017/Expense-Tracker";
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const {Signup, Login} = require("./Controllers/User/AuthController");
 const {userVerification} = require("./Middlewares/AuthMiddleware");
-const Resource = require("./models/ResourceModel")
+const ExpenseModel = require("./models/ExpenseModel")
+const cors = require("cors");
+app.use(cors());
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());  
 app.use(cookieParser());
 
-app.get("/", (req, res) => {
-  res.send("<h2>Welcome, to Expense Tracker");
-});
 
 app.post("/signup", Signup);
 
 app.post("/login", Login);
 
+app.get("/expense", async (req, res) => {
+  let expenses = await ExpenseModel.find({});
+  res.status(200).json(expenses);
+})
+
 //  Create Route
-app.post("/resource", userVerification, async (req, res) => {
+app.post("/expense", userVerification, async (req, res) => {
   try {
-    const resource = await Resource.create({
+    const expense = await ExpenseModel.create({
       ...req.body,
       createdBy: req.user._id,  // Link to logged-in user
     });
     
-    res.status(201).json({ success: true, data: resource });
+    res.status(201).json({ success: true, data: expense });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 })
 
 // Index Route
-app.get("/resource", userVerification, async (req, res) => {
-  try {
-    const resources = await Resource.find({ createdBy: req.user._id });
-    if(!resources) {
-      req.json({success: true, message: "Resources not found" })
-    }
-    res.json({ success: true, data: resources });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-})
+// app.get("/expense", userVerification, async (req, res) => {
+//   try {
+//     const expenses = await ExpenseModel.find({ createdBy: req.user._id });
+//     if(!expenses) {
+//       req.json({success: true, message: "expenses not found" })
+//     }
+//     res.json({ success: true, data: expenses });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// })
 
 // Show Route
-app.get("/resource/:id", userVerification, async (req, res) => {
+app.get("/expense/:id", userVerification, async (req, res) => {
   try {
-    const resource = await Resource.findOne({
+    const expense = await ExpenseModel.findOne({
       _id: req.params.id,
       createdBy: req.user._id
     });
 
-    if (!resource)
-      return res.status(404).json({ message: "Resource not found" });
+    if (!expense)
+      return res.status(404).json({ message: "expense not found" });
 
-    res.json({ success: true, data: resource });
+    res.json({ success: true, data: expense });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 })
 
 // Update Route
-app.put("/resource/:id", userVerification, async (req, res) => {
+app.put("/expense/:id", userVerification, async (req, res) => {
   try {
-    const resource = await Resource.findOneAndUpdate(
+    const expense = await ExpenseModel.findOneAndUpdate(
       {
         _id: req.params.id,
         createdBy: req.user._id,
@@ -77,10 +81,10 @@ app.put("/resource/:id", userVerification, async (req, res) => {
       req.body,
       { new: true }
     );
-    if (!resource)
-      return res.status(404).json({ message: "Resource not found" });
+    if (!expense)
+      return res.status(404).json({ message: "expense not found" });
 
-    res.json({ success: true, data: resource });
+    res.json({ success: true, data: expense });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -88,17 +92,17 @@ app.put("/resource/:id", userVerification, async (req, res) => {
 )
 
 // Destory Route
-app.delete("/resource/:id", userVerification, async (req, res) => {
+app.delete("/expense/:id", userVerification, async (req, res) => {
   try {
-    const resource = await Resource.findOneAndDelete({
+    const expense = await ExpenseModel.findOneAndDelete({
       _id: req.params.id,
       createdBy: req.user._id,
     });
 
-    if (!resource)
-      return res.status(404).json({ message: "Resource not found" });
+    if (!expense)
+      return res.status(404).json({ message: "expense not found" });
 
-    res.json({ success: true, message: "Resource deleted successfully" });
+    res.json({ success: true, message: "expense deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
