@@ -1,13 +1,16 @@
-import AddExpenseModal from "./Expenses/AddExpenseModal";
-
-function Navbar() {
+export default function NavbarHeader({ onAddExpense }) {
   return (
-    <nav className="navbar bg-light px-3">
-      <h3 className="navbar-brand text-primary">Expense Tracker</h3>
+    <nav className="navbar navbar-light bg-light px-4">
+      <span className="navbar-brand fw-bold">
+        Expense Tracker
+      </span>
 
-      <AddExpenseModal />
+      <button
+        className="btn btn-primary"
+        onClick={onAddExpense}
+      >
+        + Add Expense
+      </button>
     </nav>
   );
 }
-
-export default Navbar;

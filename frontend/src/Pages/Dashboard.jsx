@@ -1,38 +1,63 @@
 import { useEffect, useMemo, useState } from "react";
 import NavbarHeader from "../components/NavbarHeader";
+import AddExpenseModal from "../components/AddExpenseModal";
 import CategoryChart from "../components/CategoryChart";
-import axios from "axios";
+import api from "../api/axios";
 
 export default function Dashboard() {
   const [expenses, setExpenses] = useState([]);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  // 🔹 Fetch expenses from backend
+  /* ================= FETCH EXPENSES ================= */
   useEffect(() => {
     const fetchExpenses = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/expense");
+        const { data } = await api.get("/expense");
 
-        // Normalize backend data for frontend
-        const formatted = res.data.map((item) => ({
+        const formatted = data.map((item) => ({
           id: item._id,
           title: item.description,
           amount: item.amount,
           category: item.category,
-          date: item.date || new Date().toISOString().split("T")[0],
+          date: item.date,
         }));
 
         setExpenses(formatted);
       } catch (err) {
-        console.error("Failed to fetch expenses:", err);
+        console.error("Failed to fetch expenses", err);
       }
     };
 
     fetchExpenses();
   }, []);
 
-  // 🔹 Filter logic
+  /* ================= ADD EXPENSE (LIVE) ================= */
+  const handleExpenseAdded = (expense) => {
+    const formatted = {
+      id: expense._id,
+      title: expense.description,
+      amount: expense.amount,
+      category: expense.category,
+      date: expense.date,
+    };
+
+    setExpenses((prev) => [formatted, ...prev]);
+    setShowAddModal(false);
+  };
+
+  /* ================= DELETE ================= */
+  const deleteExpense = async (id) => {
+    try {
+      await api.delete(`/expense/${id}`);
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
+  /* ================= FILTER ================= */
   const filtered = useMemo(() => {
     return expenses.filter((e) => {
       const matchesQuery = e.title
@@ -47,21 +72,18 @@ export default function Dashboard() {
     });
   }, [expenses, query, categoryFilter]);
 
-  // 🔹 Totals
+  /* ================= TOTALS ================= */
   const totals = useMemo(() => {
-    const monthTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const monthTotal = expenses.reduce((s, e) => s + e.amount, 0);
 
     return {
       month: monthTotal,
-      week: Math.round(monthTotal / 4), // simple demo logic
-      topCategory: "Food & Dining",
-      topAmount: expenses
-        .filter((e) => e.category === "Food & Dining")
-        .reduce((s, e) => s + e.amount, 0),
+      week: Math.round(monthTotal / 4),
+      count: expenses.length,
     };
   }, [expenses]);
 
-  // 🔹 Group by date
+  /* ================= GROUP BY DATE ================= */
   const grouped = useMemo(() => {
     const map = new Map();
 
@@ -75,40 +97,31 @@ export default function Dashboard() {
     );
   }, [filtered]);
 
-  // 🔹 Delete (frontend only)
-  const deleteExpense = (id) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
-  };
-
   return (
     <div className="app-container">
-      <NavbarHeader />
+      {/* NAVBAR */}
+      <NavbarHeader onAddExpense={() => setShowAddModal(true)} />
 
-      {/* SUMMARY CARDS */}
+      {/* ADD EXPENSE MODAL */}
+      {showAddModal && (
+        <AddExpenseModal
+          onClose={() => setShowAddModal(false)}
+          onExpenseAdded={handleExpenseAdded}
+        />
+      )}
+
+      {/* SUMMARY */}
       <div className="summary-row">
         <div className="summary-card">
-          <small className="text-muted">This Month</small>
-          <div className="stat-amount">₹{totals.month.toFixed(2)}</div>
-          <div className="stat-sub">{expenses.length} transactions</div>
+          <small>This Month</small>
+          <div className="stat-amount">₹{totals.month}</div>
+          <div className="stat-sub">{totals.count} transactions</div>
         </div>
 
         <div className="summary-card">
-          <small className="text-muted">This Week</small>
-          <div className="stat-amount">₹{totals.week.toFixed(2)}</div>
+          <small>This Week</small>
+          <div className="stat-amount">₹{totals.week}</div>
           <div className="stat-sub">Estimated</div>
-        </div>
-
-        <div className="summary-card">
-          <small className="text-muted">Top Category</small>
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <strong>{totals.topCategory}</strong>
-              <div className="stat-sub">
-                ₹{totals.topAmount.toFixed(2)} spent
-              </div>
-            </div>
-            <div className="expense-icon">🍕</div>
-          </div>
         </div>
       </div>
 
@@ -121,7 +134,7 @@ export default function Dashboard() {
             <div className="d-flex gap-2">
               <input
                 className="form-control form-control-sm"
-                placeholder="Search expenses..."
+                placeholder="Search..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -144,37 +157,23 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* GROUPED EXPENSES */}
+          {/* GROUPED LIST */}
           {grouped.map(([date, items]) => (
             <div key={date}>
               <div className="group-date">
-                <span>
-                  {new Date(date).toLocaleDateString("en-IN", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-                <span>
-                  ₹{items.reduce((s, i) => s + i.amount, 0)}
-                </span>
+                <span>{new Date(date).toDateString()}</span>
+                <span>₹{items.reduce((s, i) => s + i.amount, 0)}</span>
               </div>
 
               {items.map((it) => (
                 <div key={it.id} className="expense-item">
-                  <div className="expense-left">
-                    <div className="expense-icon">
-                      {it.category.includes("Food") ? "🍔" : "💳"}
-                    </div>
-                    <div className="expense-meta">
-                      <div className="expense-title">{it.title}</div>
-                      <div className="expense-cat">{it.category}</div>
-                    </div>
+                  <div>
+                    <strong>{it.title}</strong>
+                    <div className="text-muted">{it.category}</div>
                   </div>
 
                   <div className="d-flex gap-2 align-items-center">
-                    <div className="expense-amount">-₹{it.amount}</div>
+                    <div>-₹{it.amount}</div>
                     <button
                       className="btn btn-sm btn-outline-danger"
                       onClick={() => deleteExpense(it.id)}

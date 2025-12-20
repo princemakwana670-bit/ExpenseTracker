@@ -1,97 +1,96 @@
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
-const app = express();
 const mongoose = require("mongoose");
-const PORT = 3000;
-const url = "mongodb://localhost:27017/Expense-Tracker";
-const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
-const {Signup, Login} = require("./Controllers/User/AuthController");
-const {userVerification} = require("./Middlewares/AuthMiddleware");
-const ExpenseModel = require("./models/ExpenseModel")
 const cors = require("cors");
-app.use(cors());
+const cookieParser = require("cookie-parser");
 
-app.use(express.urlencoded({extended: true}));
-app.use(express.json());  
+// Controllers & Middleware
+const { Signup, Login } = require("./Controllers/User/AuthController");
+const { userVerification } = require("./Middlewares/AuthMiddleware");
+
+// Models
+const ExpenseModel = require("./models/ExpenseModel");
+const UserModel = require("./models/UsersModel");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const DB_URL =
+  process.env.MONGO_URL || "mongodb://127.0.0.1:27017/Expense-Tracker";
+
+/* ---------- MIDDLEWARE ---------- */
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+app.use(express.json());
 app.use(cookieParser());
 
-
+/* ---------- AUTH ROUTES ---------- */
 app.post("/signup", Signup);
-
 app.post("/login", Login);
 
-app.get("/expense", async (req, res) => {
-  let expenses = await ExpenseModel.find({});
-  res.status(200).json(expenses);
-})
+/* ---------- EXPENSE ROUTES ---------- */
 
-//  Create Route
+// Get logged-in user's expenses
+app.get("/expense", userVerification, async (req, res) => {
+  try {
+    const expenses = await ExpenseModel.find({
+      createdBy: req.user._id,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json(expenses);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch expenses" });
+  }
+});
+
+// Create expense
 app.post("/expense", userVerification, async (req, res) => {
   try {
     const expense = await ExpenseModel.create({
       ...req.body,
-      createdBy: req.user._id,  // Link to logged-in user
-    });
-    
-    res.status(201).json({ success: true, data: expense });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-})
-
-// Index Route
-// app.get("/expense", userVerification, async (req, res) => {
-//   try {
-//     const expenses = await ExpenseModel.find({ createdBy: req.user._id });
-//     if(!expenses) {
-//       req.json({success: true, message: "expenses not found" })
-//     }
-//     res.json({ success: true, data: expenses });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// })
-
-// Show Route
-app.get("/expense/:id", userVerification, async (req, res) => {
-  try {
-    const expense = await ExpenseModel.findOne({
-      _id: req.params.id,
-      createdBy: req.user._id
+      createdBy: req.user._id,
     });
 
-    if (!expense)
-      return res.status(404).json({ message: "expense not found" });
+    await UserModel.findByIdAndUpdate(req.user._id, {
+      $push: { expenses: expense._id },
+    });
 
-    res.json({ success: true, data: expense });
+    res.status(201).json({
+      success: true,
+      data: expense,
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
-})
+});
 
-// Update Route
+// Update expense
 app.put("/expense/:id", userVerification, async (req, res) => {
   try {
     const expense = await ExpenseModel.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        createdBy: req.user._id,
-      },
+      { _id: req.params.id, createdBy: req.user._id },
       req.body,
       { new: true }
     );
-    if (!expense)
-      return res.status(404).json({ message: "expense not found" });
+
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
 
     res.json({ success: true, data: expense });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({ message: err.message });
   }
-}
-)
+});
 
-// Destory Route
+// Delete expense
 app.delete("/expense/:id", userVerification, async (req, res) => {
   try {
     const expense = await ExpenseModel.findOneAndDelete({
@@ -99,20 +98,32 @@ app.delete("/expense/:id", userVerification, async (req, res) => {
       createdBy: req.user._id,
     });
 
-    if (!expense)
-      return res.status(404).json({ message: "expense not found" });
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
 
-    res.json({ success: true, message: "expense deleted successfully" });
+    await UserModel.findByIdAndUpdate(req.user._id, {
+      $pull: { expenses: expense._id },
+    });
+
+    res.json({
+      success: true,
+      message: "Expense deleted successfully",
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ message: "Failed to delete expense" });
   }
-}
-)
-
-app.listen(PORT, () => {
-  console.log("app is listening on port 3000");
-  mongoose.connect(url).then(() => {
-    console.log("Database connected");
-  });
 });
 
+/* ---------- SERVER ---------- */
+mongoose
+  .connect(DB_URL)
+  .then(() => {
+    console.log("Database connected");
+    app.listen(PORT, () =>
+      console.log(`🚀 Server running on port ${PORT}`)
+    );
+  })
+  .catch((err) => {
+    console.error(" Database connection failed:", err);
+  });
