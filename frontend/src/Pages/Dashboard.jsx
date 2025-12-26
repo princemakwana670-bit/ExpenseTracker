@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavbarHeader from "../components/NavbarHeader";
 import AddExpenseModal from "../components/AddExpenseModal";
 import CategoryChart from "../components/CategoryChart";
@@ -9,6 +10,8 @@ export default function Dashboard() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [showAddModal, setShowAddModal] = useState(false);
+
+  const navigate = useNavigate();
 
   /* ================= FETCH EXPENSES ================= */
   useEffect(() => {
@@ -27,13 +30,24 @@ export default function Dashboard() {
         setExpenses(formatted);
       } catch (err) {
         console.error("Failed to fetch expenses", err);
+        navigate("/login");
       }
     };
 
     fetchExpenses();
-  }, []);
+  }, [navigate]);
 
-  /* ================= ADD EXPENSE (LIVE) ================= */
+  /* ================= LOGOUT ================= */
+  const handleLogout = async () => {
+    try {
+      await api.post("/logout");
+      navigate("/");
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
+  };
+
+  /* ================= ADD EXPENSE ================= */
   const handleExpenseAdded = (expense) => {
     const formatted = {
       id: expense._id,
@@ -102,6 +116,16 @@ export default function Dashboard() {
       {/* NAVBAR */}
       <NavbarHeader onAddExpense={() => setShowAddModal(true)} />
 
+      {/* LOGOUT BUTTON */}
+      <div className="d-flex justify-content-end p-2">
+        <button
+          className="btn btn-sm btn-outline-danger"
+          onClick={handleLogout}
+        >
+          Sign Out
+        </button>
+      </div>
+
       {/* ADD EXPENSE MODAL */}
       {showAddModal && (
         <AddExpenseModal
@@ -157,7 +181,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* GROUPED LIST */}
           {grouped.map(([date, items]) => (
             <div key={date}>
               <div className="group-date">
