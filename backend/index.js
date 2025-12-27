@@ -20,7 +20,7 @@ const DB_URL =
 /* ---------- MIDDLEWARE ---------- */
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -37,7 +37,7 @@ app.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
     sameSite: "lax",
-    secure: false, // true in production (HTTPS)
+    secure: process.env.NODE_ENV === "production", // true in production (HTTPS)
   });
 
   res.status(200).json({
@@ -51,10 +51,9 @@ app.post("/logout", (req, res) => {
 // Get logged-in user's expenses
 app.get("/expense", userVerification, async (req, res) => {
   try {
-    const expenses = await ExpenseModel.find({
-      createdBy: req.user._id,
-    }).sort({ createdAt: -1 });
-
+    const expenses = await ExpenseModel.find({ createdBy: req.user._id }).sort({
+      createdAt: -1,
+    });
     res.status(200).json(expenses);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch expenses" });
@@ -73,15 +72,9 @@ app.post("/expense", userVerification, async (req, res) => {
       $push: { expenses: expense._id },
     });
 
-    res.status(201).json({
-      success: true,
-      data: expense,
-    });
+    res.status(201).json({ success: true, data: expense });
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(400).json({ success: false, message: err.message });
   }
 });
 
@@ -94,9 +87,7 @@ app.put("/expense/:id", userVerification, async (req, res) => {
       { new: true }
     );
 
-    if (!expense) {
-      return res.status(404).json({ message: "Expense not found" });
-    }
+    if (!expense) return res.status(404).json({ message: "Expense not found" });
 
     res.json({ success: true, data: expense });
   } catch (err) {
@@ -112,18 +103,13 @@ app.delete("/expense/:id", userVerification, async (req, res) => {
       createdBy: req.user._id,
     });
 
-    if (!expense) {
-      return res.status(404).json({ message: "Expense not found" });
-    }
+    if (!expense) return res.status(404).json({ message: "Expense not found" });
 
     await UserModel.findByIdAndUpdate(req.user._id, {
       $pull: { expenses: expense._id },
     });
 
-    res.json({
-      success: true,
-      message: "Expense deleted successfully",
-    });
+    res.json({ success: true, message: "Expense deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete expense" });
   }
@@ -134,9 +120,7 @@ mongoose
   .connect(DB_URL)
   .then(() => {
     console.log("Database connected");
-    app.listen(PORT, () =>
-      console.log(`🚀 Server running on port ${PORT}`)
-    );
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   })
   .catch((err) => {
     console.error("Database connection failed:", err);
